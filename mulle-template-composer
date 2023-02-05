@@ -1,25 +1,101 @@
-#! /bin/sh
+#! /usr/bin/env mulle-bash
 
-set -e
+usage()
+{
+   local verbose="${1:-NO}"
 
-PATH="`dirname -- $0`:$PATH:"
+   cat <<EOF
+Usage:
+   ${MULLE_USAGE_NAME} mulle-template-composer [outputfile]
 
-exename="`basename -- $0`"
-tmpfile="`mktemp "${execname}.XXXXXX" `"
+   By default "outputfile" is taken to be README.md. mulle-template-composer
+   will look for a file "README.md.scion" and use this to produce
+   README.md.
 
-trap 'rm "${tmpfile}"' INT
-trap 'rm "${tmpfile}"' EXIT
+   Data is read from a file "properties.plist".
 
-mulle-scion -I includes:../mulle-readme-composer/includes \
-            README.md.scion \
-            properties.plist \
-            "${tmpfile}"
+   The default search path for includes is "includes:../includes", but this
+   can be overridden with the environment variable
+   MULLE_TEMPLATE_COMPOSER_SEARCHPATH.
 
-# Don't toc anymore because github has toc generator
-toc="`make-toc.sed < "${tmpfile}" | sed 's/"/\"/g'`"
+EOF
 
-mulle-template --clean-env \
-               -f \
-               -DTABLE_OF_CONTENTS="${toc}" \
-               "${tmpfile}" \
-               README.md
+   exit 1
+}
+
+
+main()
+{
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         # handle other flags here
+
+         -*)
+            fail "${MULLE_EXECUTABLE_FAIL_PREFIX}: Unknown option \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   PATH="`dirname -- $0`:$PATH:"
+
+   local tmpfile
+
+   r_make_tmp_file
+   tmpfile="${RVAL}"
+
+   set -e
+
+   trap 'rm "${tmpfile}"' INT
+   trap 'rm "${tmpfile}"' EXIT
+
+   local outfile
+   local template
+
+   outfile="${1:-README.md}"
+   template="${outfile}.scion"
+
+   MULLE_TEMPLATE_COMPOSER_SEARCHPATH="${MULLE_TEMPLATE_COMPOSER_SEARCHPATH:-"includes:../includes"}"
+
+   local item
+
+   .foreachpath item in .:${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}
+   .do
+      r_filepath_concat "${item}" "${template}"
+      if [ -f "${RVAL}" ]
+      then
+         template="${RVAL}"
+         .break
+      fi
+   .done
+
+   exekutor mulle-scion -I "${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}" \
+                        "${template}" \
+                        properties.plist \
+                        "${tmpfile}"
+
+   # Don't toc anymore because github has toc generator
+   # toc="`rexekutor make-toc.sed < "${tmpfile}" | sed 's/"/\"/g'`"
+
+   exekutor mulle-template --clean-env \
+                           -f \
+                           -DTABLE_OF_CONTENTS="${toc}" \
+                           "${tmpfile}" \
+                           "${outfile}"
+}
+
+main "$@"
