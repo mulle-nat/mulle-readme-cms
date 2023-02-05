@@ -1,0 +1,31 @@
+{
+   config =
+   {
+      showButtons = YES;
+      showCodacy = NO;
+   };
+   authors =
+   (
+      {
+         name="Nat!";
+         url="https://mulle-kybernetik.com/weblog";
+         organization="Mulle kybernetiK"
+      }
+   );
+   project =
+   {
+      description="🔄 Flexible C memory allocation scheme";
+      domain="github";
+      name="mulle-allocator";
+      username="mulle-c";
+      reponame="mulle-allocator";
+   };
+   dependencies =
+   (
+      {
+         name="mulle-c11";
+         url="https://github.com/mulle-c/mulle-c11";
+         description="C compiler glue and macros"
+      }
+   )
+}

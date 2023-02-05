@@ -1,0 +1,25 @@
+#! /bin/sh
+
+set -e
+
+PATH="`dirname -- $0`:$PATH:"
+
+exename="`basename -- $0`"
+tmpfile="`mktemp "${execname}.XXXXXX" `"
+
+trap 'rm "${tmpfile}"' INT
+trap 'rm "${tmpfile}"' EXIT
+
+mulle-scion -I includes:../mulle-readme-composer/includes \
+            README.md.scion \
+            properties.plist \
+            "${tmpfile}"
+
+# Don't toc anymore because github has toc generator
+toc="`make-toc.sed < "${tmpfile}" | sed 's/"/\"/g'`"
+
+mulle-template --clean-env \
+               -f \
+               -DTABLE_OF_CONTENTS="${toc}" \
+               "${tmpfile}" \
+               README.md
