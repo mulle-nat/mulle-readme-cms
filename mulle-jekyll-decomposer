@@ -1,0 +1,175 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.0.0
+# shellcheck shell=bash
+#
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_JEKYLL_DECOMPOSER_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+jekyll_decomposer::print_flags()
+{
+   echo "   -f     : force operation"
+   echo "   --json : extract YAML as JSON"
+   echo "   --yaml : extract YAML part"
+   echo "   --text : extract text part (default)"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+           "      : "
+}
+
+
+jekyll_decomposer::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   ${MULLE_USAGE_NAME} [flags]
+
+   Reads the jekyll post from stdin and either outputs the YAML part (without
+   ---) or the text of the jekyll post. On demand converts YAML to JSON using
+   the \`yq\` utility.
+
+Example:
+   ${MULLE_USAGE_NAME} --json
+   {
+     "layout": "post",
+     "author": "Nat!",
+     "date": "2023-02-06 15:20"
+   }
+
+Flags:
+EOF
+   jekyll_decomposer::print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+output_transformer()
+{
+   local options="$1"
+
+   case ",${options}," in
+      *,json,*)
+         yq eval -o json -
+      ;;
+
+      *)
+         cat
+      ;;
+   esac
+}
+
+
+jekyll_decomposer::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_TYPE='TEXT'
+   local OPTION_JSON
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            jekyll_decomposer::usage
+         ;;
+
+         --json)
+            OPTION_JSON='YES'
+            OPTION_TYPE='YAML'
+         ;;
+
+         --yaml)
+            OPTION_TYPE='YAML'
+         ;;
+
+         --text)
+            OPTION_TYPE='TEXT'
+         ;;
+
+#         --value)
+#            [ $# -eq 1 ] && match_list_usage "missing argument to $1"
+#            shift
+#
+#            OPTION_VALUE="$1"
+#         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            jekyll_decomposer::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   local options
+
+   if [ "${OPTION_JSON}" = 'YES' ]
+   then
+      if ! YQ="${YQ:-`command -v yq`}"
+      then
+         fail "Need yq installed to produce json.
+${C_INFO}Get it from:
+${C_RESET_BOLD}   https://github.com/mikefarah/yq"
+      fi
+      options='json'
+   fi
+
+   # stolen and modified from:
+   #
+   # https://stackoverflow.com/questions/28221779/how-to-remove-yaml-frontmatter-from-markdown-files
+   #
+   if [ "${OPTION_TYPE}" = 'YAML' ]
+   then
+      sed -n '1 { /^---/ { n; :a p; n; /^---/! ba; q} }' \
+      | output_transformer "${options}"
+   else
+      sed '1 { /^---/ { :a N; /\n---/! ba; d} }'
+   fi
+}
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'jekyll_decomposer::main'
+# with MULLE_JEKYLL_DECOMPOSER_FLAGS interposed.
+#
+# call_with_flags "jekyll_decomposer::main" "${MULLE_JEKYLL_DECOMPOSER_FLAGS}" "$@"
+
+jekyll_decomposer::main "$@"

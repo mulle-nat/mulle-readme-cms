@@ -1,6 +1,6 @@
 # mulle-template-composer
 
-#### 🦋 Compose README.md files from various reusable parts
+#### 🦋 Compose README.md or other markdown files from various reusable parts
 
 Not useful if you have only one project to maintain. Indispensable when you
 have dozens of projects, that need updates each release.
@@ -9,6 +9,8 @@ have dozens of projects, that need updates each release.
 |-------------------------------|--------------------------------------------
 | **mulle-template-composer**   | Create a file from template pieces
 | **mulle-markdown-decomposer** | Create distinct pieces from a markdown file
+| **mulle-jekyll-decomposer**   | Extract yaml or text from jekyll post
+
 
 ## Usage
 
