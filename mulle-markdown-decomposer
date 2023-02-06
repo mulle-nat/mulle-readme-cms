@@ -1,0 +1,399 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=6.0.0
+# shellcheck shell=bash
+#
+#
+#  mulle-extract-pieces.sh
+#  mulle-template-composer
+#
+#  Copyright (c) 2023 Nat! - Mulle kybernetiK.
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the _name of Mulle kybernetiK nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_EXTRACT_PIECES_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+decomposer::print_flags()
+{
+   echo "   --no-description : don't collect initial text without header"
+   echo "   --list           : list detected pieces filenames"
+   echo "   --mulle          : use custom logic for mulle README.md files"
+   echo "   --prefix <dir>   : place where to store pieces files (.)"
+   echo "   --extension <s>  : file extension of piece file (.md.scion)"
+   echo "   --user           : use user logic for input files (see environment)"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+                "           : "
+}
+
+MULLE_LIST="platforms-and-compilers|you-are-here|steal"
+
+decomposer::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF >&2
+Usage:
+   ${MULLE_USAGE_NAME} [flags] [file]
+
+   Decompose a markdown file into separate pieces. Each piece is written into
+   its own file. A piece is any portion of the markdown between '##' lines.
+   With custom logic, also '###' lines can be turned into a piece. For that
+   prepare a list of regular expressions (extended bash case style), to match
+   pieces filenames.
+
+Example:
+   MULLE_MARKDOWN_DECOMPOSER_LIST="${MULLE_LIST}" \\
+      ${MULLE_USAGE_NAME} --user --list < README.md
+
+Flags:
+EOF
+   decomposer::print_flags | LC_ALL=C sort >&2
+
+   cat <<EOF >&2
+
+Environment:
+   MULLE_MARKDOWN_DECOMPOSER_LIST : list of '|' separated regular expressions
+
+EOF
+
+   exit 1
+}
+
+
+cat_or_cat()
+{
+   log_entry "cat_or_cat" "$@"
+
+   case "$1" in
+      ""|"-")
+         cat
+      ;;
+
+      *)
+         cat "$1"
+      ;;
+   esac
+}
+
+
+flush()
+{
+   log_entry "flush" "$@"
+
+   local text="$1"
+   local prefix="$2"
+   local name="$3"
+   local extension="$4"
+   local header="$4"
+   local options="${5:-}"
+
+   if [ ! -z "${prefix}" ]
+   then
+      r_filepath_concat "${prefix}" "${name}"
+      name="${RVAL}"
+   fi
+
+   local filename
+
+   filename="${name}${extension}"
+
+   if [ ! -z "${text}" ]
+   then
+      case ",${options}," in
+         *,list,*)
+            printf "%s:%s\n" "${filename}" "${header}"
+         ;;
+
+         *)
+            mkdir_if_missing "${prefix}"
+            redirect_exekutor "${filename}" printf "%s\n" "${text}"
+         ;;
+      esac
+   fi
+}
+
+
+get_name()
+{
+   local line="$1"
+
+   echo "${line}" | sed -e 's/^#*[[:blank:]]*//' \
+                        -e 's/[[:blank:]]/-/g' \
+                        -e 's/[^-[:alnum:]]//g' \
+                        -e 's/-*$//' \
+                  | tr '[A-Z]' '[a-z]'
+}
+
+
+MULLE_LIST="platforms-and-compilers|you-are-here|steal"
+COUNTER="0"
+
+is_header()
+{
+   log_entry "is_header" "$@"
+
+   local name="$1"
+   local options="${2:-}"
+
+   eval "case \",${options},\" in
+      *,user,*)
+         case \"${name}\" in
+            ${MULLE_MARKDOWN_DECOMPOSER_LIST:-\\\"\\\"})
+               return 0
+            ;;
+         esac
+      ;;
+
+      *,mulle,*)
+         case \"${name}\" in
+            ${MULLE_LIST})
+               return 0
+            ;;
+         esac
+      ;;
+   esac"
+   return 1
+}
+
+
+#
+# local _text
+# local _name
+# local _header
+#
+__handle_header()
+{
+   log_entry "__handle_header" "$@"
+
+   local line="$1"
+   local prefix="$2"
+   local extension="$3"
+   local options="${4:-}"
+
+   local name
+
+   name="`get_name "${line}"`"
+   if [ -z "${name}" ]
+   then
+      printf -v name "piece-%d" "${COUNTER}"
+      COUNTER=$(( COUNTER + 1 ))
+   fi
+
+   case ",${options}," in
+      *,conditional,*)
+         if ! is_header "${name}" "${options}"
+         then
+            return 1
+         fi
+      ;;
+   esac
+
+   # flush
+   flush "${_text}" \
+         "${prefix}" \
+         "${_name}" \
+         "${extension}" \
+         "${_header}" \
+         "${options}"
+
+   _name="${name}"
+   _text="${line}"
+   _header="${line}"
+}
+
+
+decomposer::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_NAME='description'
+   local OPTION_MULLE='NO'
+   local OPTION_USER='NO'
+   local OPTION_LIST='NO'
+   local OPTION_PREFIX
+   local OPTION_EXTENSION=".md.scion"
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            decomposer::usage
+         ;;
+
+         --no-description)
+            OPTION_NAME=""
+         ;;
+
+         --prefix)
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
+            shift
+
+            OPTION_PREFIX="$1"
+         ;;
+
+         -e|--extension)
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
+            shift
+
+            OPTION_EXTENSION=".${1#.}"
+         ;;
+
+         -l|--list)
+            OPTION_LIST="YES"
+         ;;
+
+         --mulle)
+            OPTION_MULLE="YES"
+         ;;
+
+         --user)
+            OPTION_USER="YES"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+
+         ##
+         ## ADD YOUR FLAGS HERE
+         ##
+
+         -*)
+            decomposer::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   local options
+
+   if [ "${OPTION_LIST}" = 'YES' ]
+   then
+      r_comma_concat "${options}" "list"
+      options="${RVAL}"
+   fi
+   if [ "${OPTION_USER}" = 'YES' ]
+   then
+      r_comma_concat "${options}" "user"
+      options="${RVAL}"
+   else
+      if [ "${OPTION_MULLE}" = 'YES' ]
+      then
+         r_comma_concat "${options}" "mulle"
+         options="${RVAL}"
+      fi
+   fi
+
+   local _text
+   local _name
+   local _header
+
+   _name="${OPTION_NAME}"
+
+   IFS=$'\n'
+   while read -r line
+   do
+      case "${line}" in
+         \#\#\#\ *)
+            if __handle_header "${line}" \
+                               "${OPTION_PREFIX}" \
+                               "${OPTION_EXTENSION}" \
+                               "${options},conditional"
+            then
+               continue
+            fi
+         ;;
+
+         \#\#\ *)
+            __handle_header "${line}" \
+                            "${OPTION_PREFIX}" \
+                            "${OPTION_EXTENSION}" \
+                            "${options}"
+            continue
+         ;;
+      esac
+
+      if [ ! -z "${_name}" ]
+      then
+         r_add_line "${_text}" "${line}"
+         _text="${RVAL}"
+      fi
+   done < <( cat_or_cat "$1" )
+
+   flush "${_text}" \
+         "${OPTION_PREFIX}" \
+         "${_name}" \
+         "${OPTION_EXTENSION}" \
+         "${_header}" \
+         "${options}"
+}
+
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'decomposer::main'
+# with MULLE_EXTRACT_PIECES_FLAGS interposed.
+#
+# call_with_flags "decomposer::main" "${MULLE_EXTRACT_PIECES_FLAGS}" "$@"
+
+decomposer::main "$@"

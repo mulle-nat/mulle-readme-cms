@@ -1,8 +1,11 @@
 #! /usr/bin/env mulle-bash
 
+[ "${TRACE}" = 'YES' -o "${MULLE_TEMPLATE_COMPOSER_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
 usage()
 {
-   local verbose="${1:-NO}"
+   [ $# -ne 0 ] && log_error "$*"
 
    cat <<EOF
 Usage:
@@ -38,7 +41,7 @@ main()
          # handle other flags here
 
          -*)
-            fail "${MULLE_EXECUTABLE_FAIL_PREFIX}: Unknown option \"$1\""
+            usage "Unknown option \"$1\""
          ;;
 
          *)
@@ -49,52 +52,90 @@ main()
       shift
    done
 
+
    options_setup_trace "${MULLE_TRACE}" && set -x
+
+   [ $# -gt 1 ] && shift && usage "Superflous arguments \"$*\""
 
    PATH="`dirname -- $0`:$PATH:"
 
-   local tmpfile
-
-   r_make_tmp_file
-   tmpfile="${RVAL}"
-
+   #
+   # global! TMPFILE
+   #
    set -e
 
-   trap 'rm "${tmpfile}"' INT
-   trap 'rm "${tmpfile}"' EXIT
+   r_make_tmp_file
+   TMPFILE="${RVAL}"
+
+   trap 'rm "${TMPFILE}"' INT
+   trap 'rm "${TMPFILE}"' EXIT
 
    local outfile
-   local template
 
    outfile="${1:-README.md}"
-   template="${outfile}.scion"
 
-   MULLE_TEMPLATE_COMPOSER_SEARCHPATH="${MULLE_TEMPLATE_COMPOSER_SEARCHPATH:-"includes:../includes"}"
+   MULLE_TEMPLATE_COMPOSER_SEARCHPATH="${MULLE_TEMPLATE_COMPOSER_SEARCHPATH:-\
+"includes\
+:../includes\
+:../../includes\
+"}"
 
    local item
+   local template
+   local properties
+   local searchpath
 
-   .foreachpath item in .:${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}
+   r_colon_concat "." "${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}"
+   searchpath="${RVAL}"
+
+   .foreachpath item in ${searchpath}
    .do
-      r_filepath_concat "${item}" "${template}"
-      if [ -f "${RVAL}" ]
+      if [ -z "${template}" ]
       then
-         template="${RVAL}"
-         .break
+         r_filepath_concat "${item}" "${outfile}.scion"
+         if [ -f "${RVAL}" ]
+         then
+            template="${RVAL}"
+            log_fluff "Found template \"${template}\""
+         fi
+      fi
+
+      if [ -z "${properties}" ]
+      then
+         r_filepath_concat "${item}" "properties.plist"
+         if [ -f "${RVAL}" ]
+         then
+            properties="${RVAL}"
+            log_fluff "Found properties \"${properties}\""
+         else
+            # untested, but could work
+            r_filepath_concat "${item}" "properties.json"
+            if [ -f "${RVAL}" ]
+            then
+               properties="${RVAL}"
+               log_fluff "Found properties \"${properties}\""
+            fi
+         fi
       fi
    .done
 
+   template="${template:-"${outfile}.scion"}"
+   properties="${properties:-"properties.plist"}"
+
    exekutor mulle-scion -I "${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}" \
                         "${template}" \
-                        properties.plist \
-                        "${tmpfile}"
+                        "${properties}" \
+                        "${TMPFILE}"
+
+   local toc
 
    # Don't toc anymore because github has toc generator
-   # toc="`rexekutor make-toc.sed < "${tmpfile}" | sed 's/"/\"/g'`"
+   # toc="`rexekutor make-toc.sed < "${TMPFILE}" | sed 's/"/\"/g'`"
 
    exekutor mulle-template --clean-env \
                            -f \
                            -DTABLE_OF_CONTENTS="${toc}" \
-                           "${tmpfile}" \
+                           "${TMPFILE}" \
                            "${outfile}"
 }
 
