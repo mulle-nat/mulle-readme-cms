@@ -1,0 +1,12 @@
+{
+   project =
+   {
+      description="🦋 Compose README.md or other markdown files from various reusable parts";
+      domain="github";
+      name="mulle-readme-cms";
+      username="mulle-nat";
+      reponame="mulle-readme-cms";
+      homepage="https://github.com/mulle-nat/mulle-readme-cms";
+      license="BSD-3-License"
+   };
+}

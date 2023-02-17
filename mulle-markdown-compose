@@ -1,0 +1,222 @@
+#! /usr/bin/env mulle-bash
+
+[ "${TRACE}" = 'YES' -o "${MULLE_TEMPLATE_COMPOSER_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
+
+
+usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+   cat <<EOF
+Usage:
+   ${MULLE_USAGE_NAME} [flags] [file]
+
+   By default the input "file" is "README.md.scion". With the "-c" flag
+   mulle-template-compose will strip the ".scion" extension and produce a
+   file "README.md". Otherwise the result will be printed to stdout.
+
+   Data is read from a file "properties.plist".
+
+   The default search path for includes is "cola:../cola", but this
+   can be overridden with the environment variable
+   MULLE_TEMPLATE_COMPOSER_SEARCHPATH.
+
+Flags:
+   -c          : strip last path extension from inputfile and use as outputfile
+   -o <file>   : give output a different name
+   --protect   : make the output file readonly to avoid accidental edits
+
+EOF
+
+   exit 1
+}
+
+
+main()
+{
+   local OPTION_KEEP_TMP
+   local OPTION_COMPILE
+   local OPTION_PROTECT
+
+
+   local outfile
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         # handle other flags here
+         -h|--help|help)
+            usage
+         ;;
+
+         -c)
+            OPTION_COMPILE='YES'
+         ;;
+
+         -o)
+            [ $# -eq 1 ] && usage "missing argument for \"$1\""
+            shift
+
+            outfile="$1"
+         ;;
+
+         --protect)
+            OPTION_PROTECT='YES'
+         ;;
+
+         --keep-tmp)
+            OPTION_KEEP_TMP='YES'
+         ;;
+
+         -)
+            break
+         ;;
+
+         -*)
+            usage "Unknown option \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   [ $# -gt 2 ] && shift && usage "Superflous arguments \"$*\""
+
+
+   local infile="${1:-"README.md.scion"}"
+
+   if [ -z "${outfile}" ] && [ "${OPTION_COMPILE}" = 'YES' ]
+   then
+      outfile="${infile%.scion}"
+      if [ "${outfile}" = "${infile}" ]
+      then
+         usage "File ${infile} has no .scion extension"
+      fi
+   fi
+
+   PATH="`dirname -- $0`:$PATH:"
+
+   #
+   # global! TMPFILE
+   #
+
+#
+# This was used for TOC generation
+#
+#   r_make_tmp_file
+#   TMPFILE="${RVAL}"
+#
+#   if [ "${OPTION_KEEP_TMP}" != 'YES' ]
+#   then
+#      trap 'exekutor rm "${TMPFILE}"' INT
+#      trap 'exekutor rm "${TMPFILE}"' EXIT
+#   fi
+
+   MULLE_TEMPLATE_COMPOSER_SEARCHPATH="${MULLE_TEMPLATE_COMPOSER_SEARCHPATH:-\
+"cola\
+:../cola\
+:../../cola\
+"}"
+
+   local item
+   local template
+   local properties
+   local searchpath
+
+   r_colon_concat "." "${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}"
+   searchpath="${RVAL}"
+
+   local files
+   local plist
+
+   .foreachpath item in ${searchpath}
+   .do
+      if [ ! -d "${item}" ]
+      then
+         log_fluff "Missing directory \"${item}\" skipped"
+         .continue
+      fi
+
+      if [ -z "${template}" ]
+      then
+         r_filepath_concat "${item}" "${infile}"
+         log_fluff "Looking for \"${RVAL}\""
+         if [ -f "${RVAL}" ]
+         then
+            template="${RVAL}"
+            log_verbose "Found template \"${template}\""
+         fi
+      fi
+
+      log_fluff "Looking for properties in \"${item}\""
+      files="`dir_list_files "${item}" "*.plist" "f" `"
+      log_debug "files: ${files}"
+
+      .foreachline plist in ${files}
+      .do
+         log_verbose "Found properties \"${plist}\""
+         # put '.' last, so it can override what's to come later
+         r_colon_concat "${plist}" "${properties}"
+         properties="${RVAL}"
+      .done
+   .done
+
+   template="${template:-"${infile}"}"
+   properties="${properties:-"properties.plist"}"
+
+   local scionflags
+
+   case "${MULLE_TRACE}" in
+      'VERBOSE')
+         scionflags="-v"
+      ;;
+      'FLUFF')
+         scionflags="-v"
+      ;;
+      'TRACE')
+         scionflags="-v"  # set __TRACE__
+      ;;
+      '1848')
+         scionflags="-vvv"
+      ;;
+   esac
+
+   exekutor chmod +w "${outfile}" 2> /dev/null
+   exekutor mulle-scion ${MULLE_SCION_FLAGS} \
+                        ${scionflags} \
+                        -I "${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}" \
+                        "${template}" \
+                        "${properties}" \
+                        "${outfile:--}" &&
+   [ "${OPTION_PROTECT}" = 'YES' ] && exekutor chmod ugo-w "${outfile}"
+
+
+   # local toc
+   #
+   # Don't toc anymore because github has toc generator
+   # toc="`rexekutor make-toc.sed < "${TMPFILE}" | sed 's/"/\"/g'`"
+   #
+   # exekutor mulle-template --clean-env \
+   #                         -f \
+   #                         -DTABLE_OF_CONTENTS="${toc}" \
+   #                         ${MULLE_TECHNICAL_FLAGS} \
+   #                         ${MULLE_TEMPLATE_FLAGS} \
+   #                       generate \
+   #                         "${TMPFILE}" \
+   #                         "${outfile:--}"
+}
+
+main "$@"

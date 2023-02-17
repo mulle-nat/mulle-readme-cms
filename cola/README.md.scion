@@ -1,0 +1,55 @@
+{% if not config.skipHeader %}
+{%  includes optionally "header.md.bud" %}
+{% endif %}
+
+{% if not config.skipDescription %}
+{%  includes optionally "description.md.bud" %}
+{% endif %}
+
+{% if not config.skipButtons %}
+{%  includes optionally "buttons.md.bud" %}
+{% endif %}
+
+{% if not config.skipExecutables %}
+{%  includes optionally "executables.md.bud" %}
+{% endif %}
+
+{% if not config.skipExample %}
+{% includes optionally "example.md.bud" %}
+{% endif %}
+
+{% if not config.skipApi %}
+{% includes optionally "api.md.bud" %}
+{% endif %}
+
+{% if not config.skipUsage %}
+{%  includes optionally "usage.md.bud" %}
+{% endif %}
+
+{% if not config.skipInfo %}
+{%  includes optionally "info.md.bud" %}
+{% endif %}
+
+{% if not config.skipYouAreHere %}
+{%  includes optionally "you-are-here.md.bud" %}
+{% endif %}
+
+{% if not config.skipAdd %}
+{%  includes optionally "add.md.bud" %}
+{% endif %}
+
+{% if not config.skipInstall %}
+{%  includes optionally "install.md.bud" %}
+{% endif %}
+
+{% if not config.skipAuthor %}
+{%  includes optionally "author.md.bud" %}
+{% endif %}
+
+{% if not config.skipPlatforms %}
+{%  includes optionally "platforms-and-compilers.md.bud" %}
+{% endif %}
+
+{% if not config.skipFooter %}
+{%  includes optionally "footer.md.bud" %}
+{% endif %}

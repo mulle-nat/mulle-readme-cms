@@ -50,11 +50,12 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 decomposer::print_flags()
 {
-   echo "   --no-description : don't collect initial text without header"
+   echo "   -f               : overwrite existing pieces files"
+   echo "   --extension <s>  : file extension of piece file (.md.bud)"
    echo "   --list           : list detected pieces filenames"
    echo "   --mulle          : use custom logic for mulle README.md files"
+   echo "   --no-description : don't collect initial text without header"
    echo "   --prefix <dir>   : place where to store pieces files (.)"
-   echo "   --extension <s>  : file extension of piece file (.md.scion)"
    echo "   --user           : use user logic for input files (see environment)"
 
    ##
@@ -62,10 +63,13 @@ decomposer::print_flags()
    ##
 
    options_technical_flags_usage \
-                "           : "
+                "            : "
 }
 
-MULLE_LIST="platforms-and-compilers|you-are-here|steal"
+MULLE_LIST="platforms-and-compilers|author|you-are-here|steal"
+
+# stuff we replace with generic pieces
+MULLE_SHIT_LIST="add|install|${MULLE_LIST}"
 
 decomposer::usage()
 {
@@ -75,11 +79,14 @@ decomposer::usage()
 Usage:
    ${MULLE_USAGE_NAME} [flags] [file]
 
-   Decompose a markdown file into separate pieces. Each piece is written into
+   Decompose a markdown "file" into separate pieces. Each piece is written into
    its own file. A piece is any portion of the markdown between '##' lines.
    With custom logic, also '###' lines can be turned into a piece. For that
    prepare a list of regular expressions (extended bash case style), to match
-   pieces filenames.
+   pieces filenames. If no "file" is given, ${MULLE_USAGE_NAME} assumes
+   "README.md". Use '-' to specify stdin.
+
+   Use -f to overwrite existing pieces files.
 
 Example:
    MULLE_MARKDOWN_DECOMPOSER_LIST="${MULLE_LIST}" \\
@@ -92,7 +99,8 @@ EOF
    cat <<EOF >&2
 
 Environment:
-   MULLE_MARKDOWN_DECOMPOSER_LIST : list of '|' separated regular expressions
+   MULLE_MARKDOWN_DECOMPOSER_LIST      : '|' separated regexs header names
+   MULLE_MARKDOWN_DECOMPOSER_SHIT_LIST : '|' separated regexs header names
 
 EOF
 
@@ -105,7 +113,7 @@ cat_or_cat()
    log_entry "cat_or_cat" "$@"
 
    case "$1" in
-      ""|"-")
+      '-')
          cat
       ;;
 
@@ -113,6 +121,35 @@ cat_or_cat()
          cat "$1"
       ;;
    esac
+}
+
+
+is_on_shitlist()
+{
+   log_entry "is_on_shitlist" "$@"
+
+   local name="$1"
+   local options="${2:-}"
+
+   eval "case \",${options},\" in
+      *,user,*)
+         case \"${name}\" in
+            ${MULLE_MARKDOWN_SHIT_LIST:-\\\"\\\"})
+               return 0
+            ;;
+         esac
+      ;;
+
+      *,mulle,*)
+         case \"${name}\" in
+            ${MULLE_SHIT_LIST})
+               return 0
+            ;;
+         esac
+      ;;
+   esac"
+
+   return 1
 }
 
 
@@ -124,32 +161,49 @@ flush()
    local prefix="$2"
    local name="$3"
    local extension="$4"
-   local header="$4"
-   local options="${5:-}"
+   local header="$5"
+   local options="${6:-}"
 
-   if [ ! -z "${prefix}" ]
+   if [ -z "${text}" ]
+   then
+      return
+   fi
+
+   if is_on_shitlist "${name}" "${options}"
    then
       r_filepath_concat "${prefix}" "${name}"
-      name="${RVAL}"
+      filename="${RVAL}"
+
+      log_verbose "\"${filename}\" looks wilted"
    fi
 
    local filename
 
    filename="${name}${extension}"
 
-   if [ ! -z "${text}" ]
+   if [ ! -z "${prefix}" ]
    then
-      case ",${options}," in
-         *,list,*)
-            printf "%s:%s\n" "${filename}" "${header}"
-         ;;
+      r_filepath_concat "${prefix}" "${filename}"
+      filename="${RVAL}"
+   fi
 
-         *)
+   case ",${options}," in
+      *,list,*)
+         printf "%s:%s\n" "${filename}" "${header}"
+      ;;
+
+      *)
+         if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' ] \
+            || [ ! -e "${filename}" ]
+         then
+            log_info "Wrote ${C_RESET_BOLD}${filename}"
             mkdir_if_missing "${prefix}"
             redirect_exekutor "${filename}" printf "%s\n" "${text}"
-         ;;
-      esac
-   fi
+         else
+            log_verbose "\"${filename}\" already exists"
+         fi
+      ;;
+   esac
 }
 
 
@@ -165,7 +219,6 @@ get_name()
 }
 
 
-MULLE_LIST="platforms-and-compilers|you-are-here|steal"
 COUNTER="0"
 
 is_header()
@@ -228,6 +281,16 @@ __handle_header()
       ;;
    esac
 
+   local output
+
+   output="${text}"
+   case ",${options}," in
+      *,variables,*)
+
+         output="${text}"
+      ;;
+   esac
+
    # flush
    flush "${_text}" \
          "${prefix}" \
@@ -252,7 +315,7 @@ decomposer::main()
    local OPTION_USER='NO'
    local OPTION_LIST='NO'
    local OPTION_PREFIX
-   local OPTION_EXTENSION=".md.scion"
+   local OPTION_EXTENSION=".md.bud"
 
    while [ $# -ne 0 ]
    do
@@ -295,6 +358,7 @@ decomposer::main()
 
          --mulle)
             OPTION_MULLE="YES"
+            OPTION_PREFIX="${OPTION_PREFIX:-cola}"
          ;;
 
          --user)
@@ -375,10 +439,9 @@ decomposer::main()
 
       if [ ! -z "${_name}" ]
       then
-         r_add_line "${_text}" "${line}"
-         _text="${RVAL}"
+         _text="${_text}"$'\n'"${line}"
       fi
-   done < <( cat_or_cat "$1" )
+   done < <( cat_or_cat "${1:-README.md}" )
 
    flush "${_text}" \
          "${OPTION_PREFIX}" \

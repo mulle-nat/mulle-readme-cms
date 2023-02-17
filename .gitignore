@@ -1,2 +1,3 @@
 *.sublime-workspace
 .gdb_history
+*.old

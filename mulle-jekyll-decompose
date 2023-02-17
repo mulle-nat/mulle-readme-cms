@@ -16,7 +16,6 @@ MULLE_EXECUTABLE_VERSION="0.0.0"
 
 jekyll_decomposer::print_flags()
 {
-   echo "   -f     : force operation"
    echo "   --json : extract YAML as JSON"
    echo "   --yaml : extract YAML part"
    echo "   --text : extract text part (default)"

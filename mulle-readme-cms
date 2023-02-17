@@ -1,0 +1,276 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+
+
+[ "${TRACE}" = 'YES' -o "${MULLE_README_MAKE_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+readme_make::print_flags()
+{
+   echo "   -f          : force operation"
+   echo "   -p          : preview README.md in browser"
+   echo "   --decompose : call mulle-markdown-decompose to decompose a md file"
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+                " : "
+}
+
+
+readme_make::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   ${MULLE_USAGE_NAME} [flags]
+
+   If your project adheres to mulle conventions, then the files (buds) that
+   compose the README.md folder reside in a folder "cola". ${MULLE_USAGE_NAME}
+   will create a new README.md file from the buds (if \`make\` deems it
+   necessary). ${MULLE_USAGE_NAME} will also create a new "overview.dot.svg"
+   with \`mulle-sourcetree-graph\`, if necessary (and possible).
+
+   This is the Makefile used:
+
+EOF
+
+   sed 's/^/      /' <<< "${MAKEFILE_TEXT}" >&2
+
+   cat <<EOF >&2
+
+   Use the -f flag to force recreation.
+
+Flags:
+EOF
+   readme_make::print_flags | LC_ALL=C sort >&2
+
+   echo
+
+   exit 1
+}
+
+
+
+#
+# This Makefile is used to create the README.md file and the accompanying
+# overview graphic.
+#
+# MAKEFILE_TEXT="\
+#
+# README.md:  \$(cola) \$(parent_cola) overview.dot.svg cola/properties.plist
+# "$'\t'"mulle-markdown-compose -c README.md.scion
+#
+# overview.dot.svg: .mulle/etc/sourcetree/config
+# "$'\t'"mulle-sourcetree-graph > overview.dot.svg
+#
+# cola/properties.plist: .mulle/etc/sourcetree/config .mulle/etc/env/environment-project.sh
+# "$'\t'"mulle-project-properties-plist > cola/properties.plist"
+
+
+r_compose_makefile()
+{
+   local overview="$1"
+   local properties="$2"
+   local properties_aux="$2"
+
+   local text
+
+   text="\
+cola := \$(wildcard cola/*.bud cola/*.scion cola/*.plist)
+parent_cola := \$(wildcard ../cola/*.bud ../cola/*.scion cola/*.plist)
+
+README.md:  \$(cola) \$(parent_cola) ${overview}
+"$'\t'"mulle-markdown-compose \$(MULLE_TECHNICAL_FLAGS) --protect -c README.md.scion"
+
+   if [ ! -z "${overview}" ]
+   then
+      text="${text}
+
+${overview}: .mulle/etc/sourcetree/config
+"$'\t'"mulle-sourcetree-graph  \$(MULLE_TECHNICAL_FLAGS) > \"${overview}\""
+   fi
+
+   if [ ! -z "${properties}" ]
+   then
+      text="${text}
+
+${properties}: .mulle/etc/env/environment-project.sh
+"$'\t'"mulle-project-properties-plist \$(MULLE_TECHNICAL_FLAGS) \$(MULLE_FLAG)> \"${properties}\""
+
+   fi
+
+   RVAL="${text}"
+}
+
+
+
+readme_make::main()
+{
+   #
+   # simple option/flag handling
+   #
+   local OPTION_VALUE
+   local OPTION_PREVIEW
+   local OPTION_MULLE
+   local OPTION_MAKEFILE_FORCE
+
+   local overview
+   local properties
+
+   #
+   # create properties.plist once, but leave out of makefile
+   # if we are not a mulle-sde project
+   #
+   properties="cola/properties.plist"
+
+   if [ -d ".mulle/etc/sourcetree" ]
+   then
+      overview="overview.dot.svg"
+   fi
+
+   # for usage
+
+   local MAKEFILE_TEXT
+
+   r_compose_makefile "${overview}" "${properties}"
+   MAKEFILE_TEXT="${RVAL}"
+
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            readme_make::usage
+         ;;
+
+         -B|--force-make)
+            OPTION_MAKEFILE_FORCE='YES'
+         ;;
+
+         --decompose)
+            shift
+            exec mulle-markdown-decompose ${MULLE_TECHNICAL_FLAGS} "$@"
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         --mulle)
+            OPTION_MULLE='YES'
+         ;;
+
+         -p|--preview)
+            OPTION_PREVIEW='YES'
+         ;;
+
+         -*)
+            readme_make::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   r_dirname "${MULLE_EXECUTABLE}"
+   PATH="${RVAL}:${PATH}"
+
+   if [ -f .mulle/etc/env/environment-project.sh ]
+   then
+      # if it doesn't exist, make won't create it
+      # redo now if needed
+      if [ ! -f "${properties}" ]
+      then
+         log_fluff "Touch initial \"${properties}\" for make"
+         exekutor touch "${properties}"
+         OPTION_MAKEFILE_FORCE='YES'
+      else
+         log_fluff "Dynamic \"${properties}\" will be done by make"
+      fi
+   else
+      if [ ! -f "${properties}" ]
+      then
+         log_info "Creating \"${properties}\" once. make won't update it."
+         if [ "${OPTION_MULLE}" = 'YES' ]
+         then
+            redirect_exekutor "${properties}" mulle-project-properties-plist --mulle
+         else
+            redirect_exekutor "${properties}" mulle-project-properties-plist
+         fi
+      else
+         log_fluff "Static \"${properties}\" exists. make won't update it."
+      fi
+      # make shouldn't touch it now
+      properties=
+   fi
+
+   r_compose_makefile "${overview}" "${properties}"
+   MAKEFILE_TEXT="${RVAL}"
+
+   log_debug "${MAKEFILE_TEXT}"
+
+   local makeflags
+
+   if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' -o "${OPTION_MAKEFILE_FORCE}" = 'YES' ]
+   then
+      makeflags="-B"
+   fi
+
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      r_concat "${makeflags}" "VERBOSE=1"
+      makeflags="${RVAL}"
+   fi
+
+   if [ "${OPTION_MULLE}" = 'YES' ]
+   then
+      r_concat "${makeflags}" "MULLE_FLAG=--mulle"
+      makeflags="${RVAL}"
+   fi
+
+   MULLE_TECHNICAL_FLAGS="${MULLE_TECHNICAL_FLAGS}" \
+      exekutor make -f <( printf "%s\n" "${MAKEFILE_TEXT}" ) ${makeflags} || exit 1
+
+   if [ "${OPTION_PREVIEW}" = 'YES' ]
+   then
+      exekutor mulle-markdown-preview
+   fi
+}
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'readme_make::main'
+# with MULLE_README_MAKE_FLAGS interposed.
+#
+# call_with_flags "readme_make::main" "${MULLE_README_MAKE_FLAGS}" "$@"
+
+readme_make::main "$@"

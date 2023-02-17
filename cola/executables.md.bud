@@ -1,0 +1,8 @@
+## Executables
+
+| Executable                    | Description
+|-------------------------------|--------------------------------------------
+| **mulle-readme-cms**          | Run the mulle-template-composer, if files changed
+| **mulle-markdown-decomposer** | Create distinct pieces from a markdown file
+| **mulle-jekyll-decomposer**   | Extract yaml or text from jekyll post
+| **mulle-template-composer**   | Create a file from template pieces
