@@ -4,6 +4,6 @@
 Look at the [cola](cola) folder, then run
 
 ``` sh
-mulle-readme-make --protect --mulle --preview
+mulle-readme-cms --protect --mulle --preview
 ```
 

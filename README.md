@@ -26,7 +26,7 @@ Indispensable when you have dozens of projects.
 Look at the [cola](cola) folder, then run
 
 ``` sh
-mulle-readme-make --protect --mulle --preview
+mulle-readme-cms --protect --mulle --preview
 ```
 
 
@@ -36,6 +36,14 @@ mulle-readme-make --protect --mulle --preview
 
 
 ## Install
+
+Install the requirements:
+
+| Requirements                                 | Description
+|----------------------------------------------|-----------------------
+| [mulle-bashfunctions](https://github.com/mulle-nat/mulle-bashfunctions)             | 🥊 A collection of shell functions
+| [mulle-scion](https://github.com/MulleWeb/mulle-scion)             | 🌱 A modern template engine for Objective C (tool & documentation) 
+
 
 The command to install the latest mulle-readme-cms into
 `/usr/local` (with **sudo**) is:

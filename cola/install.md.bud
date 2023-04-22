@@ -1,5 +1,16 @@
 ## Install
 
+{% if dependencies.count %}
+Install the requirements:
+
+| Requirements                                 | Description
+|----------------------------------------------|-----------------------
+{% for item in dependencies %}
+| [{{ item.name}}]({{ item.url }})             | {{ item.description }}
+{% endfor %}
+{% endif %}
+
+
 The command to install the latest {{ project.name }} into
 `/usr/local` (with **sudo**) is:
 

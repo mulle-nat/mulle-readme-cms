@@ -1,0 +1,21 @@
+{
+   dependencies =
+   (
+      {
+         description="🥊 A collection of shell functions";
+         domain="github";
+         name="mulle-bashfunctions";
+         repo="mulle-bashfunctions";
+         url="https://github.com/mulle-nat/mulle-bashfunctions";
+         user="mulle-nat";
+      },
+      {
+         description="🌱 A modern template engine for Objective C (tool & documentation) ";
+         domain="github";
+         name="mulle-scion";
+         repo="mulle-scion";
+         url="https://github.com/MulleWeb/mulle-scion";
+         user="MulleWeb";
+      }
+   )
+}
