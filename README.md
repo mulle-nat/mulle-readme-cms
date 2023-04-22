@@ -2,7 +2,7 @@
 
 ... for Android, BSDs, Linux, macOS, SunOS, Windows (MinGW, WSL)
 
-You could call it a [Content Management System](ttps://de.wikipedia.org/wiki/Content-Management-System)
+You could call it a [Content Management System](https://de.wikipedia.org/wiki/Content-Management-System)
 for README.md files. Not useful if you have only one project to maintain.
 Indispensable when you have dozens of projects.
 
@@ -15,10 +15,10 @@ Indispensable when you have dozens of projects.
 
 | Executable                    | Description
 |-------------------------------|--------------------------------------------
-| **mulle-template-composer**   | Create a file from template pieces
+| **mulle-readme-cms**          | Run the mulle-template-composer, if files changed
 | **mulle-markdown-decomposer** | Create distinct pieces from a markdown file
 | **mulle-jekyll-decomposer**   | Extract yaml or text from jekyll post
-| **mulle-readme-make**         | Run the composer on demand, if files changed
+| **mulle-template-composer**   | Create a file from template pieces
 
 
 ## Example

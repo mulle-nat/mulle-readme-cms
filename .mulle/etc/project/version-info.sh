@@ -1,0 +1,6 @@
+VERSIONNAME=MULLE_EXECUTABLE_VERSION
+VERSIONFILE=mulle-readme-cms
+VERSIONMIRRORNAME=MULLE_EXECUTABLE_VERSION
+VERSIONFILEMIRRORS="mulle-jekyll-decompose
+mulle-markdown-compose
+mulle-markdown-decompose"

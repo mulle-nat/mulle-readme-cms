@@ -3,6 +3,12 @@
 [ "${TRACE}" = 'YES' -o "${MULLE_TEMPLATE_COMPOSER_TRACE}" = 'YES' ] && set -x && : "$0" "$@"
 
 
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.1"
+
+
 usage()
 {
    [ $# -ne 0 ] && log_error "$*"
@@ -72,6 +78,11 @@ main()
 
          --keep-tmp)
             OPTION_KEEP_TMP='YES'
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
          ;;
 
          -)
