@@ -7,9 +7,6 @@ for README.md files. Not useful if you have only one project to maintain.
 Indispensable when you have dozens of projects.
 
 
-| Release Version                                       | Release Notes
-|-------------------------------------------------------|--------------
-| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/mulle-nat/mulle-readme-cms.svg?branch=release) [![Build Status](https://github.com/mulle-nat/mulle-readme-cms/workflows/CI/badge.svg?branch=release)](//github.com/mulle-nat/mulle-readme-cms/actions)| [RELEASENOTES](RELEASENOTES.md) |
 
 ## Executables
 
