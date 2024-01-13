@@ -1,5 +1,0 @@
-{% if (project.domain == "github") and config.showButtons %}
-| Release Version                                       | Release Notes
-|-------------------------------------------------------|--------------
-| ![Mulle kybernetiK tag](https://img.shields.io/github/tag/{{ project.username }}/{{ project.name }}.svg?branch=release) [![Build Status](https://github.com/{{ project.username }}/{{ project.name }}/workflows/CI/badge.svg?branch=release)](//github.com/{{ project.username }}/{{ project.name }}/actions){% if config.showCodacy %} [![Codacy Badge](https://app.codacy.com/project/badge/Grade/81bef425efe046c08b31d4582411f92f)](https://www.codacy.com/gh/{{ project.username }}/{{ project.name }}/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content={{ project.username }}/{{ project.name }}&amp;utm_campaign=Badge_Grade){% endif %} | [RELEASENOTES](RELEASENOTES.md) |
-{% endif %}

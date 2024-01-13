@@ -6,7 +6,7 @@
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.0.1"
+MULLE_EXECUTABLE_VERSION="0.1.0"
 
 
 usage()
@@ -23,7 +23,7 @@ Usage:
 
    Data is read from a file "properties.plist".
 
-   The default search path for includes is "cola:../cola", but this
+   The default search path for includes is "cola:../cola:../../cola", but this
    can be overridden with the environment variable
    MULLE_TEMPLATE_COMPOSER_SEARCHPATH.
 

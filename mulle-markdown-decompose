@@ -45,7 +45,7 @@
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.0.1"
+MULLE_EXECUTABLE_VERSION="0.1.0"
 
 
 decomposer::print_flags()
@@ -197,7 +197,10 @@ flush()
             || [ ! -e "${filename}" ]
          then
             log_info "Wrote ${C_RESET_BOLD}${filename}"
-            mkdir_if_missing "${prefix}"
+            if [ ! -z "${prefix}" ]
+            then   
+               mkdir_if_missing "${prefix}"
+            fi
             redirect_exekutor "${filename}" printf "%s\n" "${text}"
          else
             log_verbose "\"${filename}\" already exists"

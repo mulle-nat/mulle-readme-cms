@@ -1,0 +1,426 @@
+#! /usr/bin/env mulle-bash
+#! MULLE_BASHFUNCTIONS_VERSION=<|MULLE_BASHFUNCTIONS_VERSION|>
+# shellcheck shell=bash
+#
+#
+#  combine-files.sh
+#  srcO
+#
+#  Copyright (c) 2023 Nat! - Mulle kybernetiK.
+#  All rights reserved.
+#
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  Redistributions of source code must retain the above copyright notice, this
+#  list of conditions and the following disclaimer.
+#
+#  Redistributions in binary form must reproduce the above copyright notice,
+#  this list of conditions and the following disclaimer in the documentation
+#  and/or other materials provided with the distribution.
+#
+#  Neither the name of Mulle kybernetiK nor the names of its contributors
+#  may be used to endorse or promote products derived from this software
+#  without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+#
+
+
+[ "${TRACE}" = 'YES' -o "${COMBINE_FILES_TRACE}" = 'YES' ] \
+&& set -x  \
+&& : "$0" "$@"
+
+### >> START OF mulle-boot.sh >>
+### << END OF mulle-boot.sh <<
+
+#
+# Versioning of this script
+#
+MULLE_EXECUTABLE_VERSION="0.0.0"
+
+
+### >> START OF mulle-bashfunctions-embed.sh >>
+### << END OF mulle-bashfunctions-embed.sh <<
+
+files::print_flags()
+{
+   echo "   -f    : force operation"
+   echo "   --all : compare all files vs all files"
+
+   ##
+   ## ADD YOUR FLAGS DESCRIPTIONS HERE
+   ##
+
+   options_technical_flags_usage \
+           "      : "
+}
+
+
+files::usage()
+{
+   [ $# -ne 0 ] && log_error "$*"
+
+
+   cat <<EOF >&2
+Usage:
+   ${MULLE_EXECUTABLE_NAME} [flags] <cola1> <cola2> ...
+
+   Find files that could move one level higher in the hierarcy.
+   So commonly in a project you would say:
+      ${MULLE_EXECUTABLE_NAME} cola ../cola ../../cola
+
+
+Flags:
+EOF
+   files::print_flags | LC_ALL=C sort >&2
+
+   exit 1
+}
+
+
+files::collect()
+{
+   log_entry "files::collect" "$@"
+
+   local i
+
+   for i in "$1"/*
+   do
+      printf "%s\n" "$i"
+   done
+}
+
+
+files::mpa_collect()
+{
+   log_entry "files::mpa_collect" "$@"
+
+   rexekutor mulle-project-all ${MULLE_TECHNICAL_FLAGS} \
+                               -d cola \
+                               --no-cd  \
+                               --exec eval 'sh -c '\''for i in "${DIRECTORY}/cola"/*; do printf "%s\n" "$i"; done'\'''
+}
+
+
+files::duplicates_database()
+{
+   log_entry "files::duplicates_database" "$@"
+
+   local filenames="$1"
+
+   # Read the file containing the filenames
+   readarray -t db <<< "${filenames}"
+
+   # Sort the filenames and count the number of occurrences of each filename
+   sorted_filenames=$(printf '%s\n' "${db[@]}" | sort | uniq -c)
+
+   # Loop through the sorted filenames and append the count to each filename
+   while read -r line; do
+       count=$(echo "$line" | awk '{print $1}')
+       filename=$(echo "$line" | awk '{$1=""; print $0}' | sed 's/^[[:space:]]*//')
+       echo "${filename};${count}"
+   done <<< "$sorted_filenames"
+}
+
+
+# these files are too particular for each project so ignore
+BORING_FILES="README.md.bud
+description.md.bud
+example.md.bud
+info.md.bud
+usage.md.bud
+dependencies.plist
+properties.plist"
+
+
+files::all()
+{
+   log_entry "files::all" "$@"
+
+   local files
+   local file
+
+   if [ $# -eq 0 ]
+   then
+      files="`files::mpa_collect`"
+   else
+      local more_files
+
+      for file in "$@"
+      do
+         more_files="`files::collect "${file}"`"
+         r_add_line "${files}" "${more_files}"
+         files="${RVAL}"
+      done
+   fi
+
+   local filename
+   local candidates
+   local all_files
+
+   #
+   # collect subprojects files only
+   #
+   .foreachline file in ${files}
+   .do
+      if [ ! -f "${file}" ]
+      then
+         .continue
+      fi
+
+      log_debug "${file}"
+
+      r_basename "${file}"
+      filename="${RVAL}"
+
+      if find_line "${BORING_FILES}" "${filename}"
+      then
+         .continue
+      fi
+
+      r_add_line "${all_files}" "${file}"
+      all_files="${RVAL}"
+
+      r_add_line "${candidates}" "${filename}"
+      candidates="${RVAL}"
+   .done
+
+   #
+   # prune single files from candidates
+   #
+   candidates="`sort <<< "${candidates}" \
+   | uniq -c \
+   | awk '{ print $2 ":" $1 }' \
+   | sed -e '/.*\/1$/d' -e 's/\(.*\):.*$/\1/' `"
+
+   log_debug "${candidates}"
+
+   local relatives
+   local relative1
+   local relative2
+   local compared
+   local i
+   local j
+   local n
+   local same
+
+   .foreachline file in ${candidates}
+   .do
+      r_escaped_grep_pattern "${file}"
+      relatives="`grep -E "/${RVAL}$" <<< "${all_files}" `"
+
+      r_count_lines "${relatives}"
+      n=${RVAL}
+
+      log_verbose "Checking ${C_RESET_BOLD}${file}${C_VERBOSE} against ${C_MAGENTA}${C_BOLD}$n${C_VERBOSE} candidates"
+      compared=
+      same=
+
+      i=0
+      while [ $i -lt $n ]
+      do
+         r_line_at_index "${relatives}" "${i}"
+         relative1="${RVAL}"
+         i=$(( i + 1))
+         j=$i
+         while [ $j -lt $n ]
+         do
+            r_line_at_index "${relatives}" "${j}"
+            relative2="${RVAL}"
+            j=$(( j + 1))
+
+            if rexekutor grep -q -F -e "${relative1}:${relative2}" \
+                                    -e "${relative2}:${relative1}" <<< "${compared}"
+            then
+               .continue
+            fi
+
+            if diff -b -q "${relative1}" "${relative2}" > /dev/null
+            then
+               r_add_unique_line "${same}" "${relative1}"
+               r_add_unique_line "${RVAL}" "${relative2}"
+               same="${RVAL}"
+            fi
+
+            r_add_line "${compared}" "${relative1}:${relative2}"
+            compared="${RVAL}"
+         done
+      done
+
+      .foreachline relative1 in ${same}
+      .do
+         _log_info "${C_RESET_BOLD}${relative1#${MULLE_USER_PWD}/}${C_INFO} has CRC32 ${C_MAGENTA}${C_BOLD}`crc32 ${relative1}`"
+      .done
+
+      if [ ! -z "${same}" ]
+      then
+         echo
+      fi
+   .done
+}
+
+
+files::compare_file_with_directory()
+{
+   log_entry "files::all" "$@"
+
+   local file="$1"
+   local directory="$2"
+
+   local other
+   local name
+
+   r_basename "${file}"
+   name="${RVAL}"
+
+   r_filepath_concat "${directory}" "${name}"
+   other="${RVAL}"
+
+   log_debug "Checking for \"${other}\" not found"
+
+   if [ ! -f "${other}" ]
+   then
+      log_fluff "\"${other}\" not found"
+      return 1
+   fi
+
+   local text
+
+   if rexekutor diff -b -q "${file}" "${other}" > /dev/null
+   then
+      log_info "File ${C_RESET_BOLD}${file}${C_INFO} is the same as ${C_RESET_BOLD}${other}${C_INFO}"
+      return 0
+   fi
+
+   log_info "File ${C_RESET_BOLD}${file}${C_INFO} overrides ${C_RESET_BOLD}${other}${C_INFO}"
+   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+   then
+      text="`diff "${file}" "${other}"`"
+      head -10 <<< "${text}"
+
+      r_count_lines "${text}"
+      if [ $RVAL -gt 10 ]
+      then
+         printf "... %d more lines ...\n" $(( RVAL - 10 ))
+      fi
+   fi
+   return 2
+}
+
+
+files::compare_file_with_directories()
+{
+   log_entry "files::all" "$@"
+
+   local file="$1" ; shift
+
+   local directory
+   local found='NO'
+
+   for directory in "$@"
+   do
+      files::compare_file_with_directory "${file}" "${directory}"
+      rc=$?
+
+      case $rc in
+         0|2)
+            found='YES'
+            break
+         ;;
+      esac
+   done
+
+   if [ "${found}" = 'NO' ]
+   then
+      log_verbose "File ${C_RESET_BOLD}${file}${C_VERBOSE} does not override anything"
+   fi
+}
+
+
+files::main()
+{
+   local FLAG_ALL
+   #
+   # simple option/flag handling
+   #
+   while [ $# -ne 0 ]
+   do
+      if options_technical_flags "$1"
+      then
+         shift
+         continue
+      fi
+
+      case "$1" in
+         -f|--force)
+            MULLE_FLAG_MAGNUM_FORCE='YES'
+         ;;
+
+         -h*|--help|help)
+            files::usage
+         ;;
+
+         --all)
+            FLAG_ALL='YES'
+         ;;
+
+         --version)
+            printf "%s\n" "${MULLE_EXECUTABLE_VERSION}"
+            exit 0
+         ;;
+
+         -*)
+            files::usage "Unknown flag \"$1\""
+         ;;
+
+         *)
+            break
+         ;;
+      esac
+
+      shift
+   done
+
+   options_setup_trace "${MULLE_TRACE}" && set -x
+
+   if [ "${FLAG_ALL}" = 'YES' ]
+   then
+      files:all "$@"
+   fi
+
+   if [ $# -lt 2 ]
+   then
+      files::usage "Need at least two directories to compare"
+   fi
+
+   local srcdir
+
+   srcdir="$1"
+   shift
+
+   for file in ${srcdir}/*
+   do
+      files::compare_file_with_directories "${file}" "$@"
+   done
+}
+
+#
+# You can also use the function `call_with_flags`, which has been defined
+# during mulle-boot. It lets you call 'files::main'
+# with COMBINE_FILES_FLAGS interposed.
+#
+# call_with_flags "files::main" "${COMBINE_FILES_FLAGS}" "$@"
+
+files::main "$@"

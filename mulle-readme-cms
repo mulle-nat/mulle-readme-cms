@@ -11,7 +11,7 @@
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.0.1"
+MULLE_EXECUTABLE_VERSION="0.1.0"
 
 
 readme_make::print_flags()
@@ -19,12 +19,13 @@ readme_make::print_flags()
    echo "   -f          : force operation"
    echo "   -p          : preview README.md in browser"
    echo "   --decompose : call mulle-markdown-decompose to decompose a md file"
+   echo "   --keep-html : do not remove preview HTML"
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
    options_technical_flags_usage \
-                " : "
+                "       : "
 }
 
 
@@ -90,9 +91,10 @@ r_compose_makefile()
 
    text="\
 cola := \$(wildcard cola/*.bud cola/*.scion cola/*.plist)
-parent_cola := \$(wildcard ../cola/*.bud ../cola/*.scion cola/*.plist)
+parent_cola := \$(wildcard ../cola/*.bud ../cola/*.scion ../cola/*.plist)
+gramps_cola := \$(wildcard ../../cola/*.bud ../../cola/*.scion ../../cola/*.plist)
 
-README.md:  \$(cola) \$(parent_cola) ${overview}
+README.md:  \$(cola) \$(parent_cola) \$(gramps_cola) ${overview}
 "$'\t'"mulle-markdown-compose \$(MULLE_TECHNICAL_FLAGS) --protect -c README.md.scion"
 
    if [ ! -z "${overview}" ]
@@ -107,7 +109,7 @@ ${overview}: .mulle/etc/sourcetree/config
    then
       text="${text}
 
-${properties}: .mulle/etc/env/environment-project.sh
+${properties}: .mulle/etc/sourcetree/config .mulle/etc/env/environment-project.sh
 "$'\t'"mulle-project-properties-plist \$(MULLE_TECHNICAL_FLAGS) \$(MULLE_FLAG)> \"${properties}\""
 
    fi
@@ -126,6 +128,7 @@ readme_make::main()
    local OPTION_PREVIEW
    local OPTION_MULLE
    local OPTION_MAKEFILE_FORCE
+   local OPTION_SDE
 
    local overview
    local properties
@@ -179,6 +182,15 @@ readme_make::main()
             exit 0
          ;;
 
+         --keep-html)
+            MULLE_MARKDOWN_PREVIEW_KEEP_HTML='YES'
+            export MULLE_MARKDOWN_PREVIEW_KEEP_HTML
+         ;;
+
+         --no-sde)
+            OPTION_SDE='NO'
+         ;;
+
          --mulle)
             OPTION_MULLE='YES'
          ;;
@@ -204,6 +216,18 @@ readme_make::main()
    r_dirname "${MULLE_EXECUTABLE}"
    PATH="${RVAL}:${PATH}"
 
+   if [ "${OPTION_SDE}" != 'NO' ]
+   then
+      local projectdir
+
+      projectdir="`mulle-sde project-dir`"
+      if [ ! -z "${projectdir}" ]
+      then
+         log_info "Found mulle-sde project, using it (suppress with --no-sde)"
+         exekutor cd "${projectdir}"
+      fi
+   fi
+
    if [ -f .mulle/etc/env/environment-project.sh ]
    then
       # if it doesn't exist, make won't create it
@@ -220,6 +244,14 @@ readme_make::main()
       if [ ! -f "${properties}" ]
       then
          log_info "Creating \"${properties}\" once. make won't update it."
+
+         r_dirname "${properties}"
+         if [ ! -d "${RVAL}" ]
+         then
+            r_basename "${RVAL}"
+            fail "No ${RVAL} folder in ${PWD}"
+         fi
+
          if [ "${OPTION_MULLE}" = 'YES' ]
          then
             redirect_exekutor "${properties}" mulle-project-properties-plist --mulle

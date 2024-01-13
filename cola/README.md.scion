@@ -34,10 +34,6 @@
 {%  includes optionally "you-are-here.md.bud" %}
 {% endif %}
 
-{% if not config.skipAdd %}
-{%  includes optionally "add.md.bud" %}
-{% endif %}
-
 {% if not config.skipInstall %}
 {%  includes optionally "install.md.bud" %}
 {% endif %}

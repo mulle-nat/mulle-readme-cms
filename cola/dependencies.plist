@@ -16,6 +16,14 @@
          repo="mulle-scion";
          url="https://github.com/MulleWeb/mulle-scion";
          user="MulleWeb";
+      },
+      {
+         description="👯 mulle-markdown turns markdown into HTML";
+         domain="github";
+         name="mulle-markdown";
+         repo="mulle-markdown";
+         url="https://github.com/MulleWeb/mulle-markdown";
+         user="MulleWeb";
       }
    )
 }
