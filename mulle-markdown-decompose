@@ -45,7 +45,7 @@
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.1.0"
+MULLE_EXECUTABLE_VERSION="0.2.0"
 
 
 decomposer::print_flags()
@@ -356,16 +356,16 @@ decomposer::main()
          ;;
 
          -l|--list)
-            OPTION_LIST="YES"
+            OPTION_LIST='YES'
          ;;
 
          --mulle)
-            OPTION_MULLE="YES"
+            OPTION_MULLE='YES'
             OPTION_PREFIX="${OPTION_PREFIX:-cola}"
          ;;
 
          --user)
-            OPTION_USER="YES"
+            OPTION_USER='YES'
          ;;
 
          --version)

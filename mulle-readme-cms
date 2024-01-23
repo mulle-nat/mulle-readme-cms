@@ -11,21 +11,22 @@
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.1.0"
+MULLE_EXECUTABLE_VERSION="0.2.0"
 
 
 readme_make::print_flags()
 {
-   echo "   -f          : force operation"
-   echo "   -p          : preview README.md in browser"
-   echo "   --decompose : call mulle-markdown-decompose to decompose a md file"
-   echo "   --keep-html : do not remove preview HTML"
+   echo "   -f           : force rebuild of README.md"
+   echo "   -p           : preview README.md in browser"
+   echo "   --decompose  : call mulle-markdown-decompose to decompose a md file"
+   echo "   --force-make : like -f, but also rebuilds overview and properties"
+   echo "   --keep-html  : do not remove preview HTML"
    ##
    ## ADD YOUR FLAGS DESCRIPTIONS HERE
    ##
 
    options_technical_flags_usage \
-                "       : "
+                "        : "
 }
 
 
@@ -83,11 +84,27 @@ EOF
 
 r_compose_makefile()
 {
+   log_entry "r_compose_makefile" "$@"
+
    local overview="$1"
    local properties="$2"
-   local properties_aux="$2"
 
    local text
+   local file
+
+   local sourcetreefile
+
+   if [ ! -z "${overview}" ]
+   then
+      sourcetreefile=".mulle/etc/sourcetree/config"
+   fi
+
+   local propertyfile
+
+   if [ ! -z "${properties}"  ]
+   then
+      propertyfile=".mulle/etc/env/environment-project.sh"
+   fi
 
    text="\
 cola := \$(wildcard cola/*.bud cola/*.scion cola/*.plist)
@@ -95,13 +112,13 @@ parent_cola := \$(wildcard ../cola/*.bud ../cola/*.scion ../cola/*.plist)
 gramps_cola := \$(wildcard ../../cola/*.bud ../../cola/*.scion ../../cola/*.plist)
 
 README.md:  \$(cola) \$(parent_cola) \$(gramps_cola) ${overview}
-"$'\t'"mulle-markdown-compose \$(MULLE_TECHNICAL_FLAGS) --protect -c README.md.scion"
+"$'\t'"mulle-markdown-compose \$(MULLE_TECHNICAL_FLAGS) --no-pwd --protect -c README.md.scion"
 
    if [ ! -z "${overview}" ]
    then
       text="${text}
 
-${overview}: .mulle/etc/sourcetree/config
+${overview}: ${sourcetreefile}
 "$'\t'"mulle-sourcetree-graph  \$(MULLE_TECHNICAL_FLAGS) > \"${overview}\""
    fi
 
@@ -109,8 +126,8 @@ ${overview}: .mulle/etc/sourcetree/config
    then
       text="${text}
 
-${properties}: .mulle/etc/sourcetree/config .mulle/etc/env/environment-project.sh
-"$'\t'"mulle-project-properties-plist \$(MULLE_TECHNICAL_FLAGS) \$(MULLE_FLAG)> \"${properties}\""
+${properties}: ${sourcetreefile} ${propertyfile}
+"$'\t'"mulle-project-properties-plist \$(MULLE_TECHNICAL_FLAGS) \$(MULLE_FLAG) > \"${properties}\""
 
    fi
 
@@ -132,23 +149,32 @@ readme_make::main()
 
    local overview
    local properties
-
+   local have_sourcetree
    #
    # create properties.plist once, but leave out of makefile
    # if we are not a mulle-sde project
    #
    properties="cola/properties.plist"
+   have_sourcetree='NO'
 
+   # if a "manual" file overview.dot exists, then don't overwrite the .sg
    if [ -d ".mulle/etc/sourcetree" ]
    then
-      overview="overview.dot.svg"
+      if [ -f "overview.dot" ]
+      then
+         log_verbose "\"overview.dot\" exists, so don't clobber \"overview.dot.svg\""
+      else
+         log_verbose "Sourcetree found, create overview.dot.svg"
+         overview="overview.dot.svg"
+         have_sourcetree='YES'
+      fi
    fi
 
    # for usage
 
    local MAKEFILE_TEXT
 
-   r_compose_makefile "${overview}" "${properties}"
+   r_compose_makefile "${overview}" "${properties}" "${have_sourcetree}"
    MAKEFILE_TEXT="${RVAL}"
 
    while [ $# -ne 0 ]
@@ -265,32 +291,46 @@ readme_make::main()
       properties=
    fi
 
-   r_compose_makefile "${overview}" "${properties}"
-   MAKEFILE_TEXT="${RVAL}"
-
-   log_debug "${MAKEFILE_TEXT}"
-
-   local makeflags
-
-   if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' -o "${OPTION_MAKEFILE_FORCE}" = 'YES' ]
+   #
+   # if we just -f, we don't use make but just recreate the README.md.scion
+   # file. Useful for example, if mulle-scion itself changed
+   #
+   if [ "${MULLE_FLAG_MAGNUM_FORCE}" = 'YES' ]
    then
-      makeflags="-B"
-   fi
+      exekutor mulle-markdown-compose ${MULLE_TECHNICAL_FLAGS} \
+                                           --no-pwd \
+                                           --protect \
+                                           -c README.md.scion \
+      || exit $?
+   else
+      r_compose_makefile "${overview}" "${properties}"
+      MAKEFILE_TEXT="${RVAL}"
 
-   if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
-   then
-      r_concat "${makeflags}" "VERBOSE=1"
-      makeflags="${RVAL}"
-   fi
+      log_debug "${MAKEFILE_TEXT}"
 
-   if [ "${OPTION_MULLE}" = 'YES' ]
-   then
-      r_concat "${makeflags}" "MULLE_FLAG=--mulle"
-      makeflags="${RVAL}"
-   fi
+      local makeflags
 
-   MULLE_TECHNICAL_FLAGS="${MULLE_TECHNICAL_FLAGS}" \
-      exekutor make -f <( printf "%s\n" "${MAKEFILE_TEXT}" ) ${makeflags} || exit 1
+      if [ "${OPTION_MAKEFILE_FORCE}" = 'YES' ]
+      then
+         makeflags="-B"
+      fi
+
+      if [ "${MULLE_FLAG_LOG_VERBOSE}" = 'YES' ]
+      then
+         r_concat "${makeflags}" "VERBOSE=1"
+         makeflags="${RVAL}"
+      fi
+
+      if [ "${OPTION_MULLE}" = 'YES' ]
+      then
+         r_concat "${makeflags}" "MULLE_FLAG=--mulle"
+         makeflags="${RVAL}"
+      fi
+
+      MULLE_TECHNICAL_FLAGS="${MULLE_TECHNICAL_FLAGS}" \
+         exekutor make -f <( printf "%s\n" "${MAKEFILE_TEXT}" ) ${makeflags} \
+         || exit $?
+   fi
 
    if [ "${OPTION_PREVIEW}" = 'YES' ]
    then

@@ -6,7 +6,7 @@
 #
 # Versioning of this script
 #
-MULLE_EXECUTABLE_VERSION="0.1.0"
+MULLE_EXECUTABLE_VERSION="0.2.0"
 
 
 usage()
@@ -23,13 +23,14 @@ Usage:
 
    Data is read from a file "properties.plist".
 
-   The default search path for includes is "cola:../cola:../../cola", but this
+   The default search path for includes is ".:cola:../cola:../../cola", but this
    can be overridden with the environment variable
    MULLE_TEMPLATE_COMPOSER_SEARCHPATH.
 
 Flags:
    -c          : strip last path extension from inputfile and use as outputfile
    -o <file>   : give output a different name
+   --no-pwd    : only look in "cola" folders not in current directory
    --protect   : make the output file readonly to avoid accidental edits
 
 EOF
@@ -43,7 +44,7 @@ main()
    local OPTION_KEEP_TMP
    local OPTION_COMPILE
    local OPTION_PROTECT
-
+   local OPTION_PWD='YES'
 
    local outfile
 
@@ -70,6 +71,10 @@ main()
             shift
 
             outfile="$1"
+         ;;
+
+         --no-pwd)
+            OPTION_PWD='NO'
          ;;
 
          --protect)
@@ -147,11 +152,16 @@ main()
    local properties
    local searchpath
 
-   r_colon_concat "." "${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}"
-   searchpath="${RVAL}"
+   searchpath="${MULLE_TEMPLATE_COMPOSER_SEARCHPATH}"
+   if [ "${OPTION_PWD}" = 'YES' ]
+   then
+      r_colon_concat "." "${searchpath}"
+      searchpath="${RVAL}"
+   fi
 
    local files
    local plist
+   local json
 
    .foreachpath item in ${searchpath}
    .do
@@ -172,8 +182,8 @@ main()
          fi
       fi
 
-      log_fluff "Looking for properties in \"${item}\""
-      files="`dir_list_files "${item}" "*.plist" "f" `"
+      log_fluff "Looking for plist properties in \"${item}\""
+      files="`dir_list_files "${item}" "*.plist" "fl" `"
       log_debug "files: ${files}"
 
       .foreachline plist in ${files}
@@ -183,6 +193,22 @@ main()
          r_colon_concat "${plist}" "${properties}"
          properties="${RVAL}"
       .done
+
+      if [ "${item}" != "." ]
+      then
+         log_fluff "Looking for JSON properties in \"${item}\""
+         files="`dir_list_files "${item}" "*.json" "fl" `"
+         log_debug "files: ${files}"
+
+         .foreachline json in ${files}
+         .do
+            log_verbose "Found JSON properties \"${json}\""
+            # put '.' last, so it can override what's to come later
+            r_colon_concat "${json}" "${properties}"
+            properties="${RVAL}"
+         .done
+      fi
+
    .done
 
    template="${template:-"${infile}"}"
