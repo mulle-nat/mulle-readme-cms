@@ -18,7 +18,7 @@ readme_make::print_flags()
 {
    echo "   -f           : force rebuild of README.md"
    echo "   -p           : preview README.md in browser"
-   echo "   --decompose  : call mulle-markdown-decompose to decompose a md file"
+   echo "   --decompose  : decompose an existing README.md file into buds"
    echo "   --force-make : like -f, but also rebuilds overview and properties"
    echo "   --keep-html  : do not remove preview HTML"
    ##
@@ -90,7 +90,6 @@ r_compose_makefile()
    local properties="$2"
 
    local text
-   local file
 
    local sourcetreefile
 
@@ -141,7 +140,6 @@ readme_make::main()
    #
    # simple option/flag handling
    #
-   local OPTION_VALUE
    local OPTION_PREVIEW
    local OPTION_MULLE
    local OPTION_MAKEFILE_FORCE
