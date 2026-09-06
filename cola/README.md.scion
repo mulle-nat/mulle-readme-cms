@@ -22,6 +22,10 @@
 {% includes optionally "api.md.bud" %}
 {% endif %}
 
+{% if not config.skipDocLinks %}
+{%  includes optionally "doclinks.md.bud" %}
+{% endif %}
+
 {% if not config.skipUsage %}
 {%  includes optionally "usage.md.bud" %}
 {% endif %}
